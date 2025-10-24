@@ -209,7 +209,8 @@ const OTPPhase = () => {
         toast.success("OTP Verified Successfully!");
         // Navigate to the next step or update application state
         console.log("OTP Correct! Navigating or completing action...");
-        navigate(`/dashuix/parcel-entry/${id}`); // Example navigation
+        navigate(`/dashuix/select-slot/${id}`)
+        //navigate(`/dashuix/parcel-entry/${id}`); // Example navigation
       } else {
         toast.error("Incorrect OTP. Please try again.");
         setOtp(""); // Clear OTP input on failure

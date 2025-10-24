@@ -1,14 +1,18 @@
 import { useNavigate, useParams } from "react-router";
 import { useDashContext } from "../components/DashWrap";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useDashData } from "../api/dashDataI";
 import { useWaitRelock } from "../api/useWaitRelock";
 import { toast } from "sonner";
 import { useCancelOrder } from "../api/useCancelOrder";
 import { useOrderExists } from "../api/useOrderExists";
+import { useQueryParamState } from "../components/useQueryParamState";
 
 const EnterParcel = () => {
   const { id } = useParams();
+  const [params] = useQueryParamState({ slotId: undefined });
+  const slotId = params.slotId;
+
   const ds = useDashContext();
   const navigate = useNavigate();
   const dashApi = useDashData(); // mutation variant
@@ -16,186 +20,221 @@ const EnterParcel = () => {
   const [loading, setLoading] = useState(true);
   const [relocking, setRelocking] = useState(false);
   const parcelApi = useWaitRelock();
-  const cancelApi = useCancelOrder()
-  const getParcelApi = useOrderExists()
+  const cancelApi = useCancelOrder();
+  const getParcelApi = useOrderExists();
+
   // --- New State for Countdown ---
-
   const [countdown, setCountdown] = useState(120);
-  const [timerActive, setTimerActive] = useState(false); // To control the timer effect
+  const [timerActive, setTimerActive] = useState(false);
 
-  const handleCancel = async () => {
-    // Implement cancel logic if needed
-    // Maybe navigate back or reset state
+  // --- store mutateAsync in refs so polling effects don't depend on the whole hook object ---
+  const dashMutateRef = useRef(dashApi.mutateAsync);
+  useEffect(() => {
+    dashMutateRef.current = dashApi.mutateAsync;
+  }, [dashApi]);
 
-    if (!id ) {
+  const parcelMutateRef = useRef(parcelApi.mutateAsync);
+  useEffect(() => {
+    parcelMutateRef.current = parcelApi.mutateAsync;
+  }, [parcelApi]);
+
+  const cancelMutateRef = useRef(cancelApi.mutateAsync);
+  useEffect(() => {
+    cancelMutateRef.current = cancelApi.mutateAsync;
+  }, [cancelApi]);
+
+  const getOrderMutateRef = useRef(getParcelApi.mutateAsync);
+  useEffect(() => {
+    getOrderMutateRef.current = getParcelApi.mutateAsync;
+  }, [getParcelApi]);
+
+  // Memoize handleCancel so effects depending on it won't re-run.
+  const handleCancel = useCallback(async () => {
+    if (!id) {
       navigate(`/dashuix`);
       return;
     }
     try {
-      await cancelApi.mutateAsync({orderId: id})
+      if (!cancelMutateRef.current) throw new Error("cancel API missing");
+      await cancelMutateRef.current({ orderId: id });
     } catch (e) {
-      toast.error("Failed to cancel order. Returning.")
+      toast.error("Failed to cancel order. Returning.");
       return;
-      
     }
-    navigate(`/dashuix`); // Example navigation
+    navigate(`/dashuix`);
     toast("Parcel drop-off cancelled.");
+  }, [id, navigate]);
 
-  };
-
-  const handleParcelOpen = async () => {
-    if (!id) return;
+  // Memoize handleParcelOpen. It's okay to depend on id/slotId/initWeight etc.
+  const handleParcelOpen = useCallback(async () => {
+    if (!id || !slotId) {
+      toast.error("Missing order ID or slot ID!");
+      return;
+    }
     setCountdown(120); // Reset countdown each time unlock is pressed
-    setTimerActive(true); // Start the timer effect
+    setTimerActive(true);
     setRelocking(true);
-    
-    try { // Added try...finally to ensure state updates correctly
-      const d = await parcelApi.mutateAsync(); // This has the 120s timeout internally
 
-      if (d.data) {
+    try {
+      const parcelMut = parcelMutateRef.current;
+      if (!parcelMut) throw new Error("parcel API unavailable");
+      const d = await parcelMut(slotId); // parcel API has its own timeout
+
+      if (d?.data) {
         toast("Relock success!");
-        const curWeight = await dashApi.mutateAsync();
+        const dashMut = dashMutateRef.current;
+        if (!dashMut) throw new Error("dash API unavailable");
+        const curWeight = await dashMut();
         if (!curWeight) {
-          // Handle error case where weight couldn't be read
           toast.error("Failed to read current weight after relock.");
-          setTimerActive(false); // Stop timer
+          setTimerActive(false);
           setRelocking(false);
           return;
         }
-        const wei = curWeight.sensors.weight;
-
+        const wei = curWeight.sensors.weights[parseInt(slotId, 10)];
         const diff = wei - initWeight;
 
         toast(`Meaningful change? ${diff} grams.`);
         if (diff < 30) {
           toast.error("Not enough weight change detected, please try again!");
-          // Don't navigate away, allow user to try again or cancel
         } else {
           toast.success("Parcel dropped off successfully!");
-          // get ORDER 
-          // if ORDER === COD, go to money collect
-          // if ORDER === PAID, go to end screen (/dashuix/end/:id)
-
-          const order = await getParcelApi.mutateAsync(id);
+          const getOrder = getOrderMutateRef.current;
+          if (!getOrder) {
+            toast.error("Order lookup unavailable.");
+            return;
+          }
+          const order = await getOrder(id);
           if (order) {
             if (order.type === "COD") {
-              navigate(`/dashuix/money/${id}?initialWeight=${initWeight}&finalWeight=${wei}`);
+              navigate(
+                `/dashuix/money/${id}?initialWeight=${initWeight}&finalWeight=${wei}`
+              );
             } else {
-              navigate(`/dashuix/end/${id}?initialWeight=${initWeight}&finalWeight=${wei}`);
+              navigate(
+                `/dashuix/end/${id}?initialWeight=${initWeight}&finalWeight=${wei}`
+              );
             }
           } else {
-            toast.error("Failed to get order. Please try again.")
+            toast.error("Failed to get order. Please try again.");
           }
-          
-
         }
-
       } else {
-        if (d.status === "MAGNET_ERROR") {
-          toast.error("Door is not closed properly. Please close it firmly and try again.");
+        if (d?.status === "MAGNET_ERROR") {
+          toast.error(
+            "Door is not closed properly. Please close it firmly and try again."
+          );
         } else {
-          // General failure or timeout from parcelApi
           toast.error("Relock failed or timed out! Check the door and try again.");
         }
       }
     } catch (error) {
-        // Catch potential errors from parcelApi.mutateAsync() itself
-        console.error("Error during parcel relock process:", error);
-        toast.error("An unexpected error occurred during the relock process.");
+      console.error("Error during parcel relock process:", error);
+      toast.error("An unexpected error occurred during the relock process.");
     } finally {
-        // This block ensures state is reset regardless of success, failure, or error
-        setTimerActive(false); // Stop timer effect
-        setRelocking(false); // Update relocking state
+      setTimerActive(false);
+      setRelocking(false);
     }
-  };
+  }, [id, slotId, initWeight, navigate]);
 
   // Effect to fetch initial weight
   useEffect(() => {
-    let isMounted = true; // Prevent state update on unmounted component
-    const d = async () => {
-      setLoading(true); // Ensure loading is true at the start
+    if (!slotId) {
+      setLoading(false);
+      return;
+    }
+    let isMounted = true;
+    const load = async () => {
+      setLoading(true);
       try {
-        const dataDash = await dashApi.mutateAsync();
+        const dashMut = dashMutateRef.current;
+        if (!dashMut) throw new Error("dash API missing");
+        const dataDash = await dashMut();
+        console.log({dataDash})
         if (isMounted && dataDash) {
-          setInitWeight(dataDash.sensors.weight);
+          setInitWeight(dataDash.sensors.weights[parseInt(slotId, 10)]);
         } else if (isMounted) {
-            toast.error("Failed to fetch initial weight.");
+          toast.error("Failed to fetch initial weight.");
         }
       } catch (error) {
         if (isMounted) {
-            console.error("Error fetching initial weight:", error);
-            toast.error("Error fetching initial weight.");
+          console.error("Error fetching initial weight:", error);
+          toast.error("Error fetching initial weight.");
         }
       } finally {
-        if (isMounted) {
-            setLoading(false);
-        }
+        if (isMounted) setLoading(false);
       }
     };
 
-    d();
-    return () => { isMounted = false }; // Cleanup function
-  }, []); // Runs once on mount
+    load();
+    return () => {
+      isMounted = false;
+    };
+  }, [slotId]); // only re-run when slotId changes — dashMutateRef is used so hook object instability doesn't restart it
 
-
-  // Effect to update the dashboard context display
-   useEffect(() => {
-    ds.setLeftSideElement(
+  // Update the dashboard context display
+  // Memoize the element so ds.setLeftSideElement receives the same reference unless meaningful inputs change
+  const leftSideElement = useMemo(() => {
+    return (
       <div>
         <div className="text-3xl font-light">Parcel Handoff</div>
         <div>Order {id}</div>
-        After dropping off the parcel, you can proceed to
-        money collection.<br />
-        <b>Initial weight: {initWeight}g</b><br />
-        <CurrentWeight /><br />
+        <div>Slot {Number(slotId) + 1}</div>
+        After dropping off the parcel, you can proceed to money collection.<br />
+        <b>Initial weight: {initWeight}g</b>
+        <br />
+        <CurrentWeight slotId={slotId} />
+        <br />
         It should weigh more after dropping off the parcel.
         <br />
-        <button onClick={handleCancel} className="text-white mt-4 bg-red-600 hover:bg-red-700 px-4 py-2 rounded">
+ 
+        <button
+          onClick={handleCancel}
+          className="text-white mt-4 ml-2 bg-red-600 hover:bg-red-700 px-4 py-2 rounded"
+        >
           Cancel Handoff
         </button>
       </div>
     );
-    // Include necessary dependencies, handleCancel might need useCallback if complex
-  }, [initWeight, id, handleCancel]);
+    // handleCancel is stable via useCallback
+  }, [initWeight, id, slotId, handleCancel, navigate]);
+
+  useEffect(() => {
+    ds.setLeftSideElement(leftSideElement);
+  }, [ds, leftSideElement]);
 
   // --- Countdown Timer Effect ---
   useEffect(() => {
-    let intervalId = null;
+    let intervalId: NodeJS.Timeout | null = null;
 
     if (timerActive && countdown > 0) {
       intervalId = setInterval(() => {
         setCountdown((prevCount) => prevCount - 1);
-      }, 1000); // Run every second
+      }, 1000);
     } else if (countdown === 0) {
-      // Optionally handle timeout explicitly here if needed,
-      // though the parcelApi handles its own timeout.
-      // Maybe show a specific timeout message independent of parcelApi?
-      // toast.warning("Drop-off time limit reached."); // Example
-      setTimerActive(false); // Ensure timer stops if it hits zero
+      setTimerActive(false);
     }
 
-    // Cleanup function to clear interval when component unmounts
-    // or when timerActive becomes false or countdown hits 0
     return () => {
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
+      if (intervalId) clearInterval(intervalId);
     };
-  }, [timerActive, countdown]); // Dependencies: run when timerActive or countdown changes
+  }, [timerActive, countdown]);
 
-
-  // Return loading state
   if (loading) return <div>Loading initial data...</div>;
 
-  // Main component render
   return (
     <div>
       <p className="mb-4">
-        Click the unlock button when you are ready to place the parcel inside the compartment.
+        Click the unlock button when you are ready to place the parcel inside the
+        compartment.
       </p>
       <button
         onClick={handleParcelOpen}
-        className={`text-white w-full px-4 py-3 rounded font-semibold ${relocking ? 'bg-gray-500 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
+        className={`text-white w-full px-4 py-3 rounded font-semibold ${
+          relocking
+            ? "bg-gray-500 cursor-not-allowed"
+            : "bg-blue-600 hover:bg-blue-700"
+        }`}
         disabled={relocking}
       >
         {relocking ? "Waiting for Relock..." : "Unlock Compartment"}
@@ -204,11 +243,16 @@ const EnterParcel = () => {
       {relocking && (
         <div className="mt-4 p-4 border border-yellow-500 bg-yellow-100 text-yellow-800 rounded">
           <p className="font-semibold">Action Required:</p>
-          <p>Please open the door, put the parcel inside, and close the door firmly.</p>
+          <p>
+            Please open the door, put the parcel inside, and close the door
+            firmly.
+          </p>
           <p className="text-lg font-bold mt-2">
             Time remaining: {countdown} seconds
           </p>
-          <p className="text-sm mt-1">The compartment will attempt to relock automatically.</p>
+          <p className="text-sm mt-1">
+            The compartment will attempt to relock automatically.
+          </p>
         </div>
       )}
     </div>
@@ -217,39 +261,56 @@ const EnterParcel = () => {
 
 export default EnterParcel;
 
-// --- CurrentWeight Component (remains the same) ---
-const CurrentWeight = () => {
+// --- CurrentWeight Component (fixed to avoid effect deps on unstable hook object) ---
+const CurrentWeight = ({ slotId }: { slotId?: string | null }) => {
   const dashApi = useDashData();
   const [weight, setWeight] = useState(0);
- 
-  useEffect(() => {
-    let isMounted = true; // Prevent state updates on unmounted components
 
-    const fetchWeight = async () => {
- 
-        try {
-            const dataDash = await dashApi.mutateAsync();
-            if (isMounted && dataDash) {
-                setWeight(dataDash.sensors.weight);
-            }
-        } catch (error) {
-            // Optionally handle fetch errors, e.g., show temporary error state
-             if (isMounted) console.error("Error fetching current weight:", error);
-        } 
+  // Keep a ref to the latest mutateAsync so the polling interval effect doesn't depend on the hook object.
+  const dashMutRef = useRef(dashApi.mutateAsync);
+  useEffect(() => {
+    dashMutRef.current = dashApi.mutateAsync;
+  }, [dashApi]);
+
+  useEffect(() => {
+    if (!slotId) return;
+    let isMounted = true;
+
+    const fetchOnce = async () => {
+      try {
+        const dashMut = dashMutRef.current;
+        if (!dashMut) return;
+        const dataDash = await dashMut();
+        if (isMounted && dataDash) {
+          setWeight(dataDash.sensors.weights[parseInt(slotId, 10)]);
+        }
+      } catch (error) {
+        if (isMounted) console.error("Error fetching current weight:", error);
+      }
     };
 
-    // Initial fetch
-    fetchWeight();
+    fetchOnce();
 
-    // Set up interval
-    const interval = setInterval(fetchWeight, 2000); // Fetch every 2 seconds
+    const interval = setInterval(async () => {
+      try {
+        const dashMut = dashMutRef.current;
+        if (!dashMut) return;
+        const dataDash = await dashMut();
+        if (isMounted && dataDash) {
+          setWeight(dataDash.sensors.weights[parseInt(slotId, 10)]);
+        }
+      } catch (error) {
+        if (isMounted) console.error("Error fetching current weight:", error);
+      }
+    }, 2000);
 
-    // Cleanup function
     return () => {
       isMounted = false;
       clearInterval(interval);
     };
-  }, []); // Removed isFetching from dependency array as it causes re-runs
+    // NOTE: intentionally only depending on slotId (primitive) so the polling
+    // interval is not recreated every render due to hook object instability.
+  }, [slotId]);
 
   return <div>Current weight: {weight}g</div>;
 };

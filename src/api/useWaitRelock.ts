@@ -9,8 +9,8 @@ const t = `/wait-relock`
 function useWaitRelock() {
   const api = useAxiosDash()
   return useMutation({
-    mutationFn: async () => {
-      const { data } = await api.post<IStatusResponse<boolean>>(t);
+    mutationFn: async (parcelIndex: number) => {
+      const { data } = await api.post<IStatusResponse<boolean>>(t + "?index=" + parcelIndex);
       return data
     },
     

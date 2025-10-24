@@ -17,6 +17,7 @@ import OTPPhase from "./screens/OTPPhase";
 import EnterParcel from "./screens/EnterParcel";
 import { ThankYou } from "./screens/ThankYou";
 import MoneyDrop from "./screens/MoneyDrop";
+import SlotSelectPhase from "./screens/SlotSelectPhase";
 
 
 const queryClient = new QueryClient({
@@ -45,6 +46,8 @@ function App() {
 
                   <Route path='/DashUIx/*' element={<DashWrap />}>
                      <Route path="o/:id" element={<OTPPhase />} />
+                     <Route path="select-slot/:id" element={<SlotSelectPhase />} />
+                     
                      <Route path="parcel-entry/:id" element={<EnterParcel />} />
                      <Route path="money/:id" element={<MoneyDrop />} />
                      <Route path="end/:id" element={<ThankYou />} />

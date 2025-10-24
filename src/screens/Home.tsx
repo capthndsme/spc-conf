@@ -30,11 +30,11 @@ const Home = () => {
 
   const [unlock, setUnlock] = useState(false)
 
-  const unlockBtn = useCallback(async () => {
+  const unlockBtn = useCallback(async (id: number) => {
     setUnlock(true);
     try {
       toast.success("Unlocked for 120 seconds")
-      await unlockApi.mutateAsync()
+      await unlockApi.mutateAsync(id)
 
     } catch (e) {
       toast.error("Failed to unlock")
@@ -296,7 +296,12 @@ const Home = () => {
           <h2 className="font-bold text-xl mt-4">Unlock</h2>
           <p>Unlocks device for 120 seconds, please relock after getting the packages.<br />
             <b>NOTE</b> Please make sure no one else is using the system.</p>
-          <Button onClick={unlockBtn} className="w-full" disabled={unlock}>Unlock</Button>
+            <div className="flex flex-row justify-center">
+                <Button onClick={() => unlockBtn(0)} className="w-[25%] mr-2" disabled={unlock}>Unlock 1</Button>
+            <Button onClick={() => unlockBtn(1)} className="w-[25%] mr-2" disabled={unlock}>Unlock 2</Button>
+            <Button onClick={() => unlockBtn(2)} className="w-[25%] mr-2" disabled={unlock}>Unlock 3</Button>
+            <Button onClick={() => unlockBtn(3)} className="w-[25%]" disabled={unlock}>Unlock 4</Button>
+            </div>
 
         </div>
 
