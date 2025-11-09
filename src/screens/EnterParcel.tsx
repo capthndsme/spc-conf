@@ -181,10 +181,6 @@ const EnterParcel = () => {
         <div>Order {id}</div>
         <div>Slot {Number(slotId) + 1}</div>
         After dropping off the parcel, you can proceed to money collection.<br />
-        <b>Initial weight: {initWeight}g</b>
-        <br />
-        <CurrentWeight slotId={slotId} />
-        <br />
         It should weigh more after dropping off the parcel.
         <br />
  
@@ -222,6 +218,8 @@ const EnterParcel = () => {
 
   if (loading) return <div>Loading initial data...</div>;
 
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
   return (
     <div>
       <p className="mb-4">
@@ -229,7 +227,7 @@ const EnterParcel = () => {
         compartment.
       </p>
       <button
-        onClick={handleParcelOpen}
+        onClick={() => setConfirmOpen(true)}
         className={`text-white w-full px-4 py-3 rounded font-semibold ${
           relocking
             ? "bg-gray-500 cursor-not-allowed"
@@ -239,6 +237,32 @@ const EnterParcel = () => {
       >
         {relocking ? "Waiting for Relock..." : "Unlock Compartment"}
       </button>
+      {
+        confirmOpen && !relocking && (
+          <div className="fixed inset-0 z-20 bg-black/50 flex items-center justify-center">
+            <div className="bg-white text-black rounded shadow-lg w-full max-w-md p-6">
+              <div className="text-xl font-semibold mb-2">Confirm Unlock</div>
+              <div className="text-sm text-gray-700 mb-4">
+                Are you sure this is the correct box to unlock?
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => setConfirmOpen(false)}
+                  className="px-4 py-2 rounded border border-gray-300 text-gray-700 hover:bg-gray-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => { setConfirmOpen(false); handleParcelOpen(); }}
+                  className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700"
+                >
+                  Yes, Unlock
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      }
 
       {relocking && (
         <div className="mt-4 p-4 border border-yellow-500 bg-yellow-100 text-yellow-800 rounded">

@@ -48,7 +48,6 @@ const MainScreen = () => {
     ds.setLeftSideElement(<div>
       <div className="text-3xl font-light">Project SafeDrop</div>
       Please enter the parcel’s Order ID and press continue to enter.<br />
-      Color: <MainScreenSelectColor />
     </div>)
   }, [])
   return <div>

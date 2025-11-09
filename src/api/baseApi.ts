@@ -18,14 +18,14 @@ export const baseApi = axios.create({
 baseApi.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response.status === 401) {
-      localStorage.removeItem('_SPC_SSN_HASH');
-      localStorage.removeItem("_SPC_USER_ID")
-      console.log("Unauthorized")
-      window.location.href = '/auth/login';
+    const status = error?.response?.status;
+    if (status === 401 || status === 403) {
+      try {
+        const event = new CustomEvent('session-expired');
+        window.dispatchEvent(event);
+      } catch {}
       return Promise.reject(new Error('Unauthorized'));
-    } else {
-      throw error
     }
+    throw error
   }
 );

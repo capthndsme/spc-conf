@@ -10,6 +10,8 @@ import Home from "./screens/Home";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import EditSlot from "./screens/EditSlot";
 import UpsertOrder from "./screens/UpsertOrder";
+import { Button } from "./components/ui/button";
+import { useEffect, useState } from "react";
 
 import DashWrap from "./components/DashWrap";
 import MainScreen from "./screens/PiScreen";
@@ -32,10 +34,39 @@ const queryClient = new QueryClient({
 
 function App() {
 
+   const [sessionExpired, setSessionExpired] = useState(false);
+   useEffect(() => {
+      const onExpire = () => setSessionExpired(true);
+      window.addEventListener('session-expired', onExpire as EventListener);
+      return () => window.removeEventListener('session-expired', onExpire as EventListener);
+   }, []);
+
    return (
       <BrowserRouter>
          <QueryClientProvider client={queryClient}>
             <AuthProvider>
+               {sessionExpired && (
+                  <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center">
+                     <div className="bg-white text-black rounded shadow-lg w-full max-w-md p-6">
+                        <div className="text-xl font-semibold mb-2">Session expired</div>
+                        <div className="text-sm text-gray-700 mb-4">
+                           Your session has expired. Please login again to continue.
+                        </div>
+                        <div className="flex justify-end gap-2">
+                           <Button variant="outline" onClick={() => setSessionExpired(false)}>
+                              Dismiss
+                           </Button>
+                           <Button onClick={() => {
+                              localStorage.removeItem('_SPC_SSN_HASH');
+                              localStorage.removeItem("_SPC_USER_ID");
+                              window.location.href = '/auth/login';
+                           }}>
+                              Go to Login
+                           </Button>
+                        </div>
+                     </div>
+                  </div>
+               )}
                <Routes>
                   <Route path="/auth/login" element={<Login />} />
                   <Route element={<ProtectedRoute />}>
