@@ -15,6 +15,8 @@ import { messaging } from "../firebaseConfig";
 import { useWaitRelock } from "../api/useWaitRelock";
 import { useGetLog } from "../api/useGetLog";
 import { useUpdateToken } from "../api/useUpdateToken";
+import LivePlayer from "../components/LivePlayer";
+import CurrentHourPlayback from "../components/CurrentHourPlayback";
 
 const Home = () => {
   // 
@@ -118,7 +120,30 @@ const Home = () => {
 
         Project Safedrop
         is a Secure Parcel Storage Solution with Integrated Surveillance and Cash Payment Mechanism<br />
-        asdasd
+      </CardContent>
+    </Card>
+    <Card className="mt-4">
+      <CardHeader>
+        <div className="flex justify-between items-center">
+          <CardTitle>Live Camera Feed</CardTitle>
+          <Link to="/cctv">
+            <Button variant="outline" size="sm">
+              📹 Open Full CCTV View
+            </Button>
+          </Link>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <LivePlayer />
+      </CardContent>
+    </Card>
+    
+    <Card className="mt-4">
+      <CardHeader>
+        <CardTitle>Current Hour Playback</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <CurrentHourPlayback />
       </CardContent>
     </Card>
     {
@@ -279,12 +304,17 @@ const Home = () => {
         <div>
           <h2 className="font-bold text-xl">Tare</h2>
           Whenever on startup, taring is a good idea.<br />
-          Current weight: {typeof dashData?.sensors?.weight === "number"
-            // convert gram to kg (2 decimal place)
-            ? (dashData?.sensors?.weight / 1000).toFixed(2) + " kg"
-
-            : "No Data"}<br />
-          <Button onClick={() => tare()} disabled={taring}>Tare</Button>
+          <div className="grid grid-cols-2 gap-2 my-2">
+            {dashData?.sensors?.weights?.map((weight, idx) => (
+              <div key={idx} className="border border-fuchsia-800 rounded p-2">
+                <span className="font-semibold">Slot {idx + 1}:</span>{" "}
+                {typeof weight === "number" 
+                  ? (weight / 1000).toFixed(2) + " kg"
+                  : "No Data"}
+              </div>
+            )) ?? <div className="col-span-2">No weight data available</div>}
+          </div>
+          <Button onClick={() => tare()} disabled={taring}>Tare All Sensors</Button>
         </div>
         <div>
           <h2 className="font-bold text-xl mt-4">System</h2>

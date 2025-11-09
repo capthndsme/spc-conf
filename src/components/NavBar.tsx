@@ -7,6 +7,7 @@ const NavBar = () => {
       <div>Project Safedrop</div>
       <div className="flex items-center space-x-4">
       <Link to="/" className="text-blue-300! hover:text-gray-300!">Home</Link>
+      <Link to="/cctv" className="text-blue-300! hover:text-gray-300!">CCTV</Link>
       <Link to="/orders" className="text-blue-300! hover:text-gray-300!">Orders</Link>
       <Link to="/history" className="text-blue-300! hover:text-gray-300!">Settings</Link>
 

@@ -18,6 +18,7 @@ import EnterParcel from "./screens/EnterParcel";
 import { ThankYou } from "./screens/ThankYou";
 import MoneyDrop from "./screens/MoneyDrop";
 import SlotSelectPhase from "./screens/SlotSelectPhase";
+import CCTVView from "./screens/CCTVView";
 
 
 const queryClient = new QueryClient({
@@ -39,6 +40,7 @@ function App() {
                   <Route path="/auth/login" element={<Login />} />
                   <Route element={<ProtectedRoute />}>
                      <Route path="/" element={<Home />} />
+                     <Route path="/cctv" element={<CCTVView />} />
                      <Route path="/slots/:id" element={<EditSlot />}></Route>
                      <Route path="/orders/create" element={<UpsertOrder />} />
                      <Route path="/orders/:id" element={<UpsertOrder />} />
