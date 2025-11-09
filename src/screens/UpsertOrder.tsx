@@ -24,19 +24,6 @@ const toast = ({ title, description, variant = "default" }: { title: string, des
   console.log('unk var', variant)
 }
 
-// Definethe possible states based on your Order type
-const orderStates: Order['state'][] = [
-  'PENDING',
-  'OTP_WAITING',
-  'DELIVERED',
-  'FINISHED',
-  'DELETED', // Include all valid states
-];
-
-// Define the possible types based on your Order type
-const orderTypes: Order['type'][] = ['COD', 'PAID'];
-
-
 const UpsertOrder = () => {
   const { id } = useParams<{ id?: string }>(); // id might be undefined for create
   const navigate = useNavigate(); // Hook for programmatic navigation
@@ -56,10 +43,8 @@ const UpsertOrder = () => {
     // Set default values if needed for 'create' mode
     orderId: '',
     otpRider: '',
-    riderName: '',
-    itemDescription: '',
-    state: 'PENDING', // Default state for new orders
-    type: 'COD',      // Default type for new orders,
+    state: 'PENDING', // Default state for new orders (automatic)
+    type: 'COD',      // Always COD only
     slotId: undefined
     
     // Add other fields with defaults or leave them undefined
@@ -73,14 +58,11 @@ const UpsertOrder = () => {
       const fetchedOrderData: Partial<Order> = {
         ...getOrderQuery.data,
         // Convert potential null/undefined values if necessary for form inputs
-        riderNumber: getOrderQuery.data.riderNumber ?? '',
-        courier: getOrderQuery.data.courier ?? '',
         orderPlaced: getOrderQuery.data.orderPlaced ?? '', // Handle potential date formatting if needed
         orderReceived: getOrderQuery.data.orderReceived ?? '',
         orderGetOut: getOrderQuery.data.orderGetOut ?? '',
         beforeWeight: getOrderQuery.data.beforeWeight ?? undefined, // Keep number|undefined
         afterWeight: getOrderQuery.data.afterWeight ?? undefined,
-        moneyContent: getOrderQuery.data.moneyContent ?? undefined,
         slotId: getOrderQuery.data.slotId ?? undefined,
     
       };
@@ -162,153 +144,47 @@ const UpsertOrder = () => {
           />
         </div>
 
-        {/* Example Field: Item Description */}
+        {/* Order Status - Automatic PENDING (hidden, shown for info only) */}
         <div>
-          <Label htmlFor="itemDescription">Item Description</Label>
+          <Label htmlFor="state">Order Status</Label>
           <Input
-            id="itemDescription"
-            name="itemDescription"
-            value={formData.itemDescription ?? ''}
-            onChange={handleInputChange}
-            required
-            placeholder="Describe the item(s)"
+            id="state"
+            name="state"
+            value="PENDING"
+            disabled
+            className="bg-gray-100"
           />
+          <p className="text-sm text-gray-500 mt-1">Status is automatically set to PENDING</p>
         </div>
 
-        {/* Example Field: Rider Name */}
+        {/* Slot Selection - Always COD */}
         <div>
-          <Label htmlFor="riderName">Rider Name</Label>
-          <Input
-            id="riderName"
-            name="riderName"
-            value={formData.riderName ?? ''}
-            onChange={handleInputChange}
-            placeholder="Rider's full name"
-          />
-        </div>
-        {
-          // Rider Phone number
-          // used for OTP
-        }
-        <div>
-          <Label htmlFor="riderNumber">Rider Phone Number</Label>
-          <Input
-            id="riderNumber"
-            name="riderNumber"
-            value={formData.riderNumber ?? ''}
-            onChange={handleInputChange}
-            placeholder="+639000000000"
-          />
-        </div>
- 
-        {/* Example Field: Courier */}
-        <div>
-          <Label htmlFor="courier">Courier</Label>
-          <Input
-            id="courier"
-            name="courier"
-            value={formData.courier ?? ''}
-            onChange={handleInputChange}
-            placeholder="e.g., J&T Express"
-          />
-        </div>
-        
-
-        {/* --- State Dropdown Example --- */}
-        <div>
-          <Label htmlFor="state">Order State</Label>
+          <Label htmlFor="slotId">Slot (COD)</Label>
           <Select
-            name="state" // Optional: Useful if you adapt handleChange
-            value={formData.state ?? ''}
-            onValueChange={(value) => handleSelectChange('state', value as Order['state'])} // Pass field name and value
+            name="slotId"
+            value={formData.slotId?.toString() ?? ''}
+            onValueChange={(value) => handleSelectChange('slotId', value)}
           >
-            <SelectTrigger id="state">
-              <SelectValue placeholder="Select state..." />
+            <SelectTrigger id="slotId">
+              <SelectValue placeholder="Select slot..." />
             </SelectTrigger>
             <SelectContent>
-              {orderStates.map((stateValue) => (
-                <SelectItem key={stateValue} value={stateValue}>
-                  {/* You might want nicer display names */}
-                  {stateValue.replace('_', ' ')}
+              {
+                // the current slot selected
+              }
+              {
+                !!formData.slotId && <SelectItem value={formData.slotId.toString()} disabled>
+                  {formData.slotId} (Selected)
                 </SelectItem>
-              ))}
+              }
+              
+              {availableSlots.data?.filter(s => s.activeOrderId === null || s.activeOrderId === undefined)?.map((slot) => (
+                <SelectItem key={slot.id} value={slot.id.toString()}>
+                  {slot.id}
+                </SelectItem>
+              )) ?? <SelectItem value="none">No slots</SelectItem>}
             </SelectContent>
           </Select>
-        </div>
-        {/* --- End State Dropdown Example --- */}
-
-        {/* Example Field: Order Type (Dropdown) */}
-        <div>
-          <Label htmlFor="type">Order Type</Label>
-          <Select
-            name="type"
-            value={formData.type ?? ''}
-            onValueChange={(value) => handleSelectChange('type', value as Order['type'])}
-          >
-            <SelectTrigger id="type">
-              <SelectValue placeholder="Select type..." />
-            </SelectTrigger>
-            <SelectContent>
-              {orderTypes.map((typeValue) => (
-                <SelectItem key={typeValue} value={typeValue}>
-                  {typeValue}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        {
-          // DropDown of Slots
-        }
-        {
-          formData?.type === "COD" && <>
-
-            <Label htmlFor="slotId">Slot (COD)</Label>
-            <Select
-              name="slotId"
-              value={formData.slotId?.toString() ?? ''}
-              onValueChange={(value) => handleSelectChange('slotId', value)}
-            >
-              <SelectTrigger id="slotId">
-                <SelectValue placeholder="Select slot..." />
-              </SelectTrigger>
-              <SelectContent>
-                {
-                  // the current slot selected
-                }
-                {
-                  !!formData.slotId && <SelectItem value={formData.slotId.toString()} disabled>
-                    {formData.slotId} (Selected)
-                  </SelectItem>
-                }
-                
-                {availableSlots.data?.filter(s => s.activeOrderId === null || s.activeOrderId === undefined)?.map((slot) => (
-                  <SelectItem key={slot.id} value={slot.id.toString()}>
-                    {slot.id}
-                  </SelectItem>
-                )) ?? <SelectItem value="none">No slots</SelectItem>}
-              </SelectContent>
-            </Select>
-
-          </>
-        }
-
-        {/* Add other form fields here following the pattern: */}
-        {/* Label, Input/Select, value, onChange/onValueChange */}
-        {/* Example: otpRider, riderNumber, courier, dates, weights, moneyContent */}
-
-        {/* Example: Money Content (Number) */}
-        <div>
-          <Label htmlFor="moneyContent">Money Content (Optional)</Label>
-          <Input
-            id="moneyContent"
-            name="moneyContent"
-            type="number" // Use type="number"
-            value={formData.moneyContent ?? ''} // Handle potential undefined
-            onChange={handleInputChange}
-            placeholder="e.g., 1500.00"
-            step="0.01" // Optional: for decimal steps
-          />
         </div>
 
 

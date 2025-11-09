@@ -237,12 +237,6 @@ const Home = () => {
               accessorKey: 'id'
             },
             {
-              header: "Money Amount",
-              accessorKey: "moneyAmount",
-              columnSuffix: " PHP",
-              nullFallback: "No money"
-            },
-            {
               header: "Active Order ID",
               accessorKey: "activeOrderId",
               cell: (row) => row?.activeOrderId
