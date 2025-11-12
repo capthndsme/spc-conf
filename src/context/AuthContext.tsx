@@ -4,6 +4,7 @@ import { Auth, AuthReturn } from "../types/IAuth";
 export const AuthContext = createContext<Auth>({
    hash: null,
    setHash: () => {},
+   logout: () => {},
 });
 
 AuthContext.displayName = "Auth";
@@ -21,15 +22,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
    }); // Add useState hook
 
    useEffect(() => {
-      if (hash === null || hash === undefined) return;
+      if (hash === null || hash === undefined) {
+         // Clear localStorage when hash is cleared
+         localStorage.removeItem("_SPC_SSN_HASH");
+         localStorage.removeItem("_SPC_USER_ID");
+         return;
+      }
       console.log("set", hash)
       localStorage.setItem("_SPC_SSN_HASH", hash?.token ?? "");
       localStorage.setItem("_SPC_USER_ID", hash?.userId?.toString() ?? "")
    }, [hash?.token, hash?.userId]);
+
+   const logout = () => {
+      setHash(null);
+      localStorage.removeItem("_SPC_SSN_HASH");
+      localStorage.removeItem("_SPC_USER_ID");
+   };
+
    const value = useMemo<Auth>(() => {
       return {
          hash,
          setHash,
+         logout,
       };
    }, [hash?.token, hash?.userId]);
 

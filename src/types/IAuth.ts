@@ -6,5 +6,6 @@ export type AuthReturn = {
 }
 export type Auth = {
   hash: AuthReturn | null | undefined,
-  setHash: React.Dispatch<React.SetStateAction<AuthReturn | null | undefined>>
+  setHash: React.Dispatch<React.SetStateAction<AuthReturn | null | undefined>>,
+  logout: () => void
 }

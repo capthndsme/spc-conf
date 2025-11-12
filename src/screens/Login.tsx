@@ -20,6 +20,12 @@ export const Login = (): JSX.Element => {
 
   const auth = useAuth();
 
+  // Redirect to home if already logged in
+  if (auth.hash) {
+    location.href = "/";
+    return <></>;
+  }
+
 
   const login = async () => {
     try {
@@ -27,12 +33,10 @@ export const Login = (): JSX.Element => {
       const result = await authApi.login(username, password);
       if (result.status === 201) {
         auth.setHash(result.data);
-        baseApi.defaults.headers.common.Authorization = result.data.token;
-        baseApi.defaults.headers.common["X-user-id"] =
-          result.data.userId.toString();
+        // No need to manually set headers anymore - interceptor handles it
 
         await new Promise((resolve) => setTimeout(resolve, 560));
-        toast.info("Logging in success.")
+        toast.success("Login successful")
         location.href = "/";
       }
     } catch (e) {
